@@ -44,8 +44,7 @@ class LlavaMetaModel:
         mm_vision_select_layer = model_args.mm_vision_select_layer
         mm_vision_select_feature = model_args.mm_vision_select_feature
         pretrain_mm_mlp_adapter = model_args.pretrain_mm_mlp_adapter
-        gamma_state = getattr(model_args, 'gamma_state', "train")
-        gamma = getattr(model_args, 'gamma', 0.23)
+        theta_state = getattr(model_args, 'theta_state', True)
 
         self.config.mm_vision_tower = vision_tower
 
@@ -68,8 +67,7 @@ class LlavaMetaModel:
         self.config.mm_hidden_size = vision_tower.hidden_size
         self.config.mm_vision_select_layer = mm_vision_select_layer
         self.config.mm_vision_select_feature = mm_vision_select_feature
-        self.config.gamma_state = gamma_state
-        self.config.gamma = gamma
+        self.config.theta_state = theta_state
 
         if getattr(self, 'mm_projector', None) is None:
             self.mm_projector = build_vision_projector(self.config)

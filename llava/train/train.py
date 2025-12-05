@@ -59,8 +59,14 @@ class ModelArguments:
     mm_use_im_start_end: bool = field(default=False)
     mm_use_im_patch_token: bool = field(default=True)
     mm_vision_select_feature: Optional[str] = field(default="patch")
-    theta_state: bool = field(default=True,
-                              metadata={"help": "Controls frequency seed: True=ones, False=random*0.23"})
+    gamma_state: str = field(
+        default="train",
+        metadata={"help": "Controls frequency seed: train=ones, infer=random*0.23"},
+    )
+    gamma: float = field(
+        default=0.23,
+        metadata={"help": "Scaling factor for random seed when gamma_state=infer"},
+    )
 
 
 @dataclass
@@ -665,7 +671,6 @@ class LazySupervisedDataset(Dataset):
         return length_list
     
     def get_frequency_subimg(self, image, cutoff_frequency = 30):
-        # 高斯低通滤波器
         image=image.permute(1, 2, 0)
 
         rows, cols, channels= image.shape
@@ -674,57 +679,34 @@ class LazySupervisedDataset(Dataset):
             rows, cols = size
             crow, ccol = rows // 2, cols // 2
             mask = torch.zeros((rows, cols), dtype=torch.float32)
-            # 创建坐标网格
             y, x = torch.meshgrid(torch.arange(rows, dtype=torch.float32), 
                                 torch.arange(cols, dtype=torch.float32), indexing='ij')
 
-            # 计算与中心点的距离
             d_squared = (x - ccol) ** 2 + (y - crow) ** 2
 
-            # 计算高斯分布
             mask = torch.exp(-d_squared / (2 * (cutoff ** 2)))
-            # for i in range(rows):
-            #     for j in range(cols):
-            #         # i = torch.tensor(i, dtype=torch.float32)
-            #         # j = torch.tensor(j, dtype=torch.float32)
-            #         d = math.sqrt((i - crow) ** 2 + (j - ccol) ** 2)
-            #         mask[i, j] = math.exp(-(d**2) / (2 * (cutoff**2)))  # 高斯分布
             return mask
-        # 高斯高通滤波器
         def gaussian_highpass_filter(size, cutoff):
             lowpass_mask = gaussian_lowpass_filter(size, cutoff)
-            return 1 - lowpass_mask  # 高通滤波器是低通的反转
-
-        # 对每个通道应用傅里叶变换，滤波，然后逆变换
+            return 1 - lowpass_mask
         def apply_filter(image_tensor, filter_func, cutoff):
             image_tensor=image_tensor.to(dtype=torch.float32)
             filtered_image = torch.zeros_like(image_tensor).to(device=image_tensor.device)
             
             for c in range(channels):
-                # 对每个通道进行傅里叶变换
                 f_image = torch.fft.fft2(image_tensor[:, :, c])
-                fshift = torch.fft.fftshift(f_image).to(device=image_tensor.device)  # 将低频移到中心
-                
-                # 创建高斯滤波器
+                fshift = torch.fft.fftshift(f_image).to(device=image_tensor.device)
                 filter_mask = filter_func((rows, cols), cutoff).to(device=image_tensor.device)
-                
-                # 应用滤波器
                 fshift_filtered = fshift * filter_mask
-                
-                # 逆傅里叶变换
                 f_ishift = torch.fft.ifftshift(fshift_filtered)
                 img_back = torch.fft.ifft2(f_ishift)
                 img_back_magnitude = torch.abs(img_back)
-                
-                # 存储滤波后的图像
                 filtered_image[:, :, c] = img_back_magnitude
                 
             return filtered_image.to(dtype=torch.bfloat16)
 
-        # 应用高斯低通滤波器
         lowpass_image_tensor = apply_filter(image, gaussian_lowpass_filter, cutoff_frequency)
 
-        # 应用高斯高通滤波器
         highpass_image_tensor = apply_filter(image, gaussian_highpass_filter, cutoff_frequency)
         highpass_image_tensor=highpass_image_tensor.permute(2, 0, 1)
         lowpass_image_tensor=lowpass_image_tensor.permute(2, 0, 1)
@@ -732,22 +714,14 @@ class LazySupervisedDataset(Dataset):
 
 
     def get_frequency_image(self, image):
-        # print(image.size(),image_feature.size())
-        # highpass_images, lowpass_images = [],[]
-        # for i in range(images.size(0)):
         highpass_image, lowpass_image = self.get_frequency_subimg(image)
-            # highpass_images.append(highpass_image)
-            # print(highpass_image.size())
-            # lowpass_images.append(lowpass_image)
-        # highpass_images = torch.stack(highpass_images)
-        # lowpass_images = torch.stack(lowpass_images)
         return highpass_image, lowpass_image
     
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
         sources = self.list_data_dict[i]
         if isinstance(i, int):
             sources = [sources]
-        assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
+        assert len(sources) == 1, "Don't know why it is wrapped to a list"
         if 'image' in sources[0]:
             image_file = self.list_data_dict[i]['image']
             image_folder = self.data_args.image_folder
@@ -783,16 +757,12 @@ class LazySupervisedDataset(Dataset):
             data_dict = dict(input_ids=data_dict["input_ids"][0],
                              labels=data_dict["labels"][0])
 
-        # image exist in the data
         if 'image' in self.list_data_dict[i]:
             data_dict['images'] = image
             highpass_image, lowpass_image = self.get_frequency_image(image)
-            # print('check')
             data_dict['highpass_images'] = highpass_image
             data_dict['lowpass_images'] = lowpass_image
-            #TODO: 补上剩下两个image
         elif self.data_args.is_multimodal:
-            # image does not exist in the data, but the model is multimodal
             crop_size = self.data_args.image_processor.crop_size
             data_dict['images'] = torch.zeros(3, crop_size['height'], crop_size['width'])
             data_dict['highpass_images'] = torch.zeros(3, crop_size['height'], crop_size['width'])

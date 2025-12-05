@@ -7,7 +7,8 @@ export NCCL_DEBUG=INFO
 ps -ef | grep train_gpu | awk '{print $2}' | xargs kill -9
 # export NCCL_P2P_DISIBLE=1 
 OUTPUT_DIR='./checkpoints/llava-v1.5-7b-mfp'
-THETA_STATE=True
+GAMMA_STATE=train
+GAMMA=0.23
 
 
 deepspeed  --hostfile ./scripts/v1_5/hostfile \
@@ -45,5 +46,6 @@ deepspeed  --hostfile ./scripts/v1_5/hostfile \
     --dataloader_num_workers 20 \
     --lazy_preprocess True \
     --report_to "tensorboard" \
-    --theta_state ${THETA_STATE} \
+    --gamma_state ${GAMMA_STATE} \
+    --gamma ${GAMMA} \
 2>&1 | tee -a "${OUTPUT_DIR}/training_log.txt"
