@@ -1,4 +1,6 @@
 # 【EMNLP 2025】Mitigating Object Hallucinations in MLLMs via Multi-Frequency Perturbations
+<img width="2442" height="804" alt="image" src="https://github.com/user-attachments/assets/c06ce866-b75e-4e02-9a9f-e1e053b8f3d9" />
+
 ## Quick Start
 Our codebase and environment configuration using [llava](https://github.com/haotian-liu/LLaVA). Most of our changes are in the [clip_encoder.py](https://github.com/galactic123/MFP/blob/main/llava/model/multimodal_encoder/clip_encoder.py) file.
 
