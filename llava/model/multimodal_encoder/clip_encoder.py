@@ -22,10 +22,11 @@ class CLIPVisionTower(nn.Module):
         self.gamma_state = str(gamma_state).lower()
         self.gamma = float(getattr(args, 'gamma', 0.23))
         
+        self.mfp_hidden_size = 1024
 
-        self.w_q = nn.Linear(1024, 1024)
-        self.w_k = nn.Linear(1024, 1024)
-        self.w_v = nn.Linear(1024, 1024)
+        self.w_q = nn.Linear(self.mfp_hidden_size, self.mfp_hidden_size)
+        self.w_k = nn.Linear(self.mfp_hidden_size, self.mfp_hidden_size)
+        self.w_v = nn.Linear(self.mfp_hidden_size, self.mfp_hidden_size)
         if not delay_load:
             self.load_model()
         else:
@@ -58,12 +59,11 @@ class CLIPVisionTower(nn.Module):
         Q = self.w_q(image_features)
         K = self.w_k(auxiliary_features)
         V = self.w_v(auxiliary_features)
-        attention_scores = torch.matmul(Q, K.transpose(-1, -2)) / math.sqrt(1024)
-
+        attention_scores = torch.matmul(Q, K.transpose(-1, -2)) / math.sqrt(self.mfp_hidden_size)
         attention_weights = torch.softmax(attention_scores, dim=-1)
-
         output = torch.matmul(attention_weights, V)
         return output
+
     def get_frequency_subimg(self, image, cutoff_frequency = 30):
         
         bz, channels, rows, cols= image.shape
