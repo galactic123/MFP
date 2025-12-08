@@ -21,16 +21,16 @@ class CLIPVisionTower(nn.Module):
             gamma_state = 'train' if gamma_state else 'infer'
         self.gamma_state = str(gamma_state).lower()
         self.gamma = float(getattr(args, 'gamma', 0.23))
-        
-        self.mfp_hidden_size = 1024
-
-        self.w_q = nn.Linear(self.mfp_hidden_size, self.mfp_hidden_size)
-        self.w_k = nn.Linear(self.mfp_hidden_size, self.mfp_hidden_size)
-        self.w_v = nn.Linear(self.mfp_hidden_size, self.mfp_hidden_size)
         if not delay_load:
             self.load_model()
         else:
             self.cfg_only = CLIPVisionConfig.from_pretrained(self.vision_tower_name)
+        
+        self.mfp_hidden_size = int(getattr(args, 'mfp_hidden_size', 1024))  
+
+        self.w_q = nn.Linear(self.mfp_hidden_size, self.mfp_hidden_size)
+        self.w_k = nn.Linear(self.mfp_hidden_size, self.mfp_hidden_size)
+        self.w_v = nn.Linear(self.mfp_hidden_size, self.mfp_hidden_size)
             
 
     def load_model(self):

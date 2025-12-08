@@ -67,7 +67,10 @@ class ModelArguments:
         default=0.23,
         metadata={"help": "Scaling factor for random seed when gamma_state=infer"},
     )
-
+    mfp_hidden_size: int = field(
+        default=1024,
+        metadata={"help": "Hidden size for MFP (Multi-Frequency Projection) module"},
+    )
 
 @dataclass
 class DataArguments:
